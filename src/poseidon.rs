@@ -1,13 +1,51 @@
+use plonky2::util::serialization::IoResult;
+use plonky2::plonk::config::GenericConfig;
+use serde_json::json;
+use std::fs::File;
+use std::io::Write;
+
+
+fn save_files<C: GenericConfig<D>, const D: usize>(
+    // todo: fix this serialization
+    data: &plonky2::plonk::circuit_data::CircuitData<C::F, C, D>,
+    proof: &plonky2::plonk::proof::ProofWithPublicInputs<C::F, C, D>,
+) -> IoResult<()> {
+    // Serialize CommonCircuitData
+    let common_data_bytes = serde_json::to_string_pretty(&data.common).unwrap();
+    let mut common_data_file = File::create("src/out/common_circuit_data.json").unwrap();
+    common_data_file.write_all(common_data_bytes.as_bytes()).unwrap();
+
+    // Serialize VerifierOnlyCircuitData (use DefaultGateSerializer)
+    let verifier_only_json = json!({
+        "circuit_digest": data.verifier_only.circuit_digest,
+        "constants_sigmas_cap": data.verifier_only.constants_sigmas_cap,
+    });    
+    let verifier_data_json = serde_json::to_string_pretty(&verifier_only_json).unwrap();
+    println!("verifier_data: {:?}", data.verifier_only);
+    let mut verifier_data_file = File::create("src/out/verifier_only_circuit_data.json").unwrap();
+    verifier_data_file.write_all(verifier_data_json.as_bytes()).unwrap();
+
+    // Serialize ProofWithPublicInputs
+    let proof_bytes = serde_json::to_string_pretty(proof).unwrap();
+    println!("proof: {:?}", proof);
+    let mut proof_file = File::create("src/out/proof_with_public_inputs.json").unwrap();
+    proof_file.write_all(proof_bytes.as_bytes()).unwrap();
+
+    Ok(())
+}
+
+
+
 #[cfg(test)]
 mod examples {
+    use super::save_files;
+    use plonky2::util::serialization::DefaultGateSerializer;
     use plonky2::field::types::Field;
     use plonky2::hash::poseidon::PoseidonHash;
     use plonky2::iop::witness::{PartialWitness, WitnessWrite};
     use plonky2::plonk::circuit_builder::CircuitBuilder;
     use plonky2::plonk::circuit_data::{CircuitConfig, VerifierCircuitData};
     use plonky2::plonk::config::{GenericConfig, Hasher, PoseidonGoldilocksConfig};
-    use plonky2::util::serialization::DefaultGateSerializer;
-
     #[test]
     fn poseidon() -> anyhow::Result<()> {
         const D: usize = 2;
@@ -50,7 +88,7 @@ mod examples {
         pw.set_target(expected_hash_4, hash_val.elements[3])?;
 
         let proof = data.prove(pw)?;
-
+        save_files(&data, &proof).expect("Failed to write proof files");
         println!("Expected hash: {:?}", hash_val.elements.to_vec());
         println!("Proof public input: {:?}", proof.public_inputs.to_vec());
         let elf_serialized = data.verifier_data().to_bytes(&DefaultGateSerializer).expect("Failed to serialize program ELF");
