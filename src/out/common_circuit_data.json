@@ -1,41 +1,41 @@
 {
   "config": {
-    "num_wires": 135,
-    "num_routed_wires": 80,
-    "num_constants": 2,
-    "use_base_arithmetic_gate": true,
-    "security_bits": 100,
-    "num_challenges": 2,
-    "zero_knowledge": false,
-    "max_quotient_degree_factor": 8,
     "fri_config": {
-      "rate_bits": 3,
       "cap_height": 4,
+      "num_query_rounds": 28,
       "proof_of_work_bits": 16,
+      "rate_bits": 3,
       "reduction_strategy": {
         "ConstantArityBits": [
           4,
           5
         ]
-      },
-      "num_query_rounds": 28
-    }
+      }
+    },
+    "max_quotient_degree_factor": 8,
+    "num_challenges": 2,
+    "num_constants": 2,
+    "num_routed_wires": 80,
+    "num_wires": 135,
+    "security_bits": 100,
+    "use_base_arithmetic_gate": true,
+    "zero_knowledge": false
   },
   "fri_params": {
     "config": {
-      "rate_bits": 3,
       "cap_height": 4,
+      "num_query_rounds": 28,
       "proof_of_work_bits": 16,
+      "rate_bits": 3,
       "reduction_strategy": {
         "ConstantArityBits": [
           4,
           5
         ]
-      },
-      "num_query_rounds": 28
+      }
     },
-    "hiding": false,
     "degree_bits": 2,
+    "hiding": false,
     "reduction_arity_bits": []
   },
   "gates": [
@@ -43,23 +43,6 @@
     "PublicInputGate",
     "PoseidonGate(PhantomData<plonky2_field::goldilocks_field::GoldilocksField>)<WIDTH=12>"
   ],
-  "selectors_info": {
-    "selector_indices": [
-      0,
-      0,
-      0
-    ],
-    "groups": [
-      {
-        "start": 0,
-        "end": 3
-      }
-    ]
-  },
-  "quotient_degree_factor": 8,
-  "num_gate_constraints": 123,
-  "num_constants": 3,
-  "num_public_inputs": 4,
   "k_is": [
     1,
     14293326489335486720,
@@ -142,8 +125,25 @@
     10381049954328279003,
     3834749477258943827
   ],
-  "num_partial_products": 9,
+  "luts": [],
+  "num_constants": 3,
+  "num_gate_constraints": 123,
   "num_lookup_polys": 0,
   "num_lookup_selectors": 0,
-  "luts": []
+  "num_partial_products": 9,
+  "num_public_inputs": 4,
+  "quotient_degree_factor": 8,
+  "selectors_info": {
+    "groups": [
+      {
+        "end": 3,
+        "start": 0
+      }
+    ],
+    "selector_indices": [
+      0,
+      0,
+      0
+    ]
+  }
 }
