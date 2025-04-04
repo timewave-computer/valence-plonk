@@ -28,7 +28,7 @@ fn hash_two<F: BigPrimeField>(
     let ctx = builder.main(0);
 
     let [x, y] = inp.inputs.map(|x| ctx.load_witness(F::from_str_vartime(&x).unwrap()));
-    
+
     // Commit input values to the public inputs (optional, but commonly done for transparency)
     make_public.extend([x, y]);
 
@@ -49,14 +49,8 @@ fn hash_two<F: BigPrimeField>(
     // 👇 Commit final hash to the public inputs of the circuit (this is the actual output)
     make_public.push(hash);
 
-    println!(
-        "x: {:?}, y: {:?}, final_poseidon_hash: {:?}",
-        x.value(),
-        y.value(),
-        hash.value()
-    );
+    println!("x: {:?}, y: {:?}, final_poseidon_hash: {:?}", x.value(), y.value(), hash.value());
 }
-
 
 fn main() {
     env_logger::init();
@@ -66,22 +60,23 @@ fn main() {
 }
 
 #[cfg(test)]
-mod tests{
+mod tests {
+    use snark_verifier_sdk::Snark;
     use std::fs::File;
     use std::io::BufReader;
-    use snark_verifier_sdk::Snark;
     #[test]
     fn print_final_hash_commitment() {
-        let file = File::open("/Users/chef/Desktop/halo2-scaffold/data/poseidon.snark").expect("cannot open snark file");
+        let file = File::open("/Users/chef/Desktop/halo2-scaffold/data/poseidon.snark")
+            .expect("cannot open snark file");
         let reader = BufReader::new(file);
-    
+
         let snark: Snark = bincode::deserialize_from(reader).expect("failed to deserialize snark");
-    
+
         println!("Public inputs:");
         for (i, instance_group) in snark.instances.iter().enumerate() {
             println!("Instance group {}:", i);
             for val in instance_group {
-                println!("{:?}", val);  // Use Debug trait, not Display
+                println!("{:?}", val); // Use Debug trait, not Display
             }
         }
     }
