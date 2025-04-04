@@ -1,15 +1,4 @@
-[package]
-name = "valence-plonky2"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+name = "valence-plonk"
 
-[dependencies]
-plonky2 = "1.0.2"
-anyhow = "1"
-base64 = "0.22"
-serde = "1"
-serde_with = "3"
-serde_json = "1"
-num-bigint = "0.4"
-hex = "0.4"
-num-traits = "0.2"
+members = ["plonky-X", "halo2-scaffold"]
