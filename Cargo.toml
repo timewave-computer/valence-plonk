@@ -1,4 +1,4 @@
 [workspace]
 name = "valence-plonk"
 
-members = ["plonky-X", "halo2-scaffold"]
+members = ["plonky-X", "halo2-scaffold", "arkworks-poseidon"]

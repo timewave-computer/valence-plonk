@@ -31,3 +31,15 @@ Supported.
 Beyond bad - very easy to make mistakes, probably even worse than circom.
 ## Painpoints
 Dev X, Wrapping, Trusted Setup
+
+
+# 3. Arkworks
+See [here](arkworks-poseidon/src/lib.rs)
+## Wrapping with Groth16
+Produces native Groth16 proofs (very good)
+## Poseidon
+Supported. Customizable.
+## Developer Experience
+Mid, better than Halo2.
+## Painpoints
+Trusted Setup, auditing
