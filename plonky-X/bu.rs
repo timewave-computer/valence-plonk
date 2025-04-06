@@ -1,26 +1,27 @@
 use num_bigint::BigUint;
-use plonky2::hash::hash_types::{HashOut, RichField};
-use plonky2::plonk::circuit_builder::CircuitBuilder;
-use serde::{Serialize, Serializer};
-use serde_json::{Value, Map};
-use plonky2::field::types::Field;
-use plonky2::hash::poseidon::PoseidonHash;
-use plonky2::plonk::config::{GenericConfig, Hasher, PoseidonGoldilocksConfig};
 use plonky2::iop::witness::{PartialWitness, WitnessWrite};
-use plonky2::util::serialization::{IoResult, DefaultGateSerializer};
+use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::circuit_data::{CircuitConfig, VerifierCircuitData};
+use plonky2::plonk::config::{GenericConfig, Hasher, PoseidonGoldilocksConfig};
+use plonky2::util::serialization::{DefaultGateSerializer, IoResult};
+//use plonky2_bn254_poseidon::poseidon::PoseidonCircuit;
+use plonky2::hash::poseidon::PoseidonHash;
+use serde::Serialize;
+use serde_json::Value;
+use std::fs;
+use std::str::FromStr;
 use plonky2_bn254_poseidon::arithmetic::FrTarget;
 use ark_bn254::Fr;
+use plonky2::field::types::Field;
 use num_traits::ToPrimitive;
-use std::fs;
+
 
 const D: usize = 2;
 type C = PoseidonGoldilocksConfig;
 type F = <C as GenericConfig<D>>::F;
 
-// Custom serializer for Goldilocks field elements
 fn serialize_with_key_path(val: Value, path: Vec<String>) -> Value {
-    fn is_goldilocks_field_array_key(path: &[String]) -> bool {
+    fn is_bn254_field_array_key(path: &[String]) -> bool {
         matches!(
             path.last().map(|s| s.as_str()),
             Some(
@@ -36,7 +37,7 @@ fn serialize_with_key_path(val: Value, path: Vec<String>) -> Value {
 
     match val {
         Value::Object(mut map) => {
-            if map.len() == 1 && map.contains_key("elements") && is_goldilocks_field_array_key(&path) {
+            if map.len() == 1 && map.contains_key("elements") && is_bn254_field_array_key(&path) {
                 return serialize_with_key_path(map.remove("elements").unwrap(), path);
             }
 
@@ -51,14 +52,45 @@ fn serialize_with_key_path(val: Value, path: Vec<String>) -> Value {
         }
 
         Value::Array(arr) => {
-            if is_goldilocks_field_array_key(&path) {
-                if arr.iter().all(|v| v.is_u64()) && arr.len() % 4 == 0 {
+            if is_bn254_field_array_key(&path) {
+                // [[u64; 4], ...]
+                if arr.iter().all(|v| matches!(v, Value::Array(inner) if inner.len() == 4 && inner.iter().all(|x| x.is_u64()))) {
+                    let packed = arr.into_iter().map(|v| {
+                        if let Value::Array(inner) = v {
+                            let acc = inner
+                                .into_iter()
+                                .rev()
+                                .fold(BigUint::from(0u64), |acc, x| {
+                                    (acc << 64) + BigUint::from(x.as_u64().unwrap())
+                                });
+                            Value::String(acc.to_str_radix(10))
+                        } else {
+                            v // shouldn’t happen
+                        }
+                    }).collect();
+                    return Value::Array(packed);
+                }
+
+                // Flat [u64, u64, ...]
+                if arr.iter().all(|v| v.is_u64()) {
+                    if arr.len() % 4 != 0 {
+                        // 🛡️ Fallback to raw array (DON’T panic, DON’T wrap again)
+                        return Value::Array(
+                            arr.into_iter()
+                                .map(|v| serialize_with_key_path(v, path.clone()))
+                                .collect(),
+                        );
+                    }
+
                     let packed = arr
                         .chunks(4)
                         .map(|chunk| {
-                            let acc = chunk.iter().rev().fold(BigUint::from(0u64), |acc, x| {
-                                (acc << 64) + BigUint::from(x.as_u64().unwrap())
-                            });
+                            let acc = chunk
+                                .iter()
+                                .rev()
+                                .fold(BigUint::from(0u64), |acc, x| {
+                                    (acc << 64) + BigUint::from(x.as_u64().unwrap())
+                                });
                             Value::String(acc.to_str_radix(10))
                         })
                         .collect();
@@ -66,6 +98,7 @@ fn serialize_with_key_path(val: Value, path: Vec<String>) -> Value {
                 }
             }
 
+            // Default: recursively handle inner values, prevent nested string arrays
             Value::Array(
                 arr.into_iter()
                     .map(|v| {
@@ -93,36 +126,6 @@ fn serialize_with_key_path(val: Value, path: Vec<String>) -> Value {
     }
 }
 
-// Wrapper struct for Poseidon hash output
-pub struct PoseidonHashWrapper<F: Field> {
-    pub hash: HashOut<F>, // HashOut contains the field elements (field0, field1, field2, field3)
-}
-
-impl<F: RichField> Serialize for PoseidonHashWrapper<F> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        // Convert each field element from HashOut<F> to BigUint
-        let limbs = [
-            BigUint::from(self.hash.elements[0].to_canonical_u64()), // field0
-            BigUint::from(self.hash.elements[1].to_canonical_u64()), // field1
-            BigUint::from(self.hash.elements[2].to_canonical_u64()), // field2
-            BigUint::from(self.hash.elements[3].to_canonical_u64()), // field3
-        ];
-
-        // Combine the limbs into one BigUint
-        let mut value = limbs[3].clone();
-        value = (value << 64) | limbs[2].clone();
-        value = (value << 64) | limbs[1].clone();
-        value = (value << 64) | limbs[0].clone();
-
-        // Serialize the final BigUint value as a string
-        serializer.serialize_str(&value.to_string())
-    }
-}
-
-// Example function to save serialized hash output to a file
 pub(crate) fn save_files<C: GenericConfig<D>, const D: usize>(
     data: &plonky2::plonk::circuit_data::CircuitData<C::F, C, D>,
     proof: &plonky2::plonk::proof::ProofWithPublicInputs<C::F, C, D>,
@@ -134,7 +137,6 @@ where
     let verifier_only_json = serde_json::to_value(&data.verifier_only).unwrap();
     let proof_json = serde_json::to_value(proof).unwrap();
 
-    // Serialize with customized field handling
     let common_data_simplified = serialize_with_key_path(common_data_json, vec![]);
     let verifier_only_simplified = serialize_with_key_path(verifier_only_json, vec![]);
     let proof_simplified = serialize_with_key_path(proof_json, vec![]);
@@ -157,7 +159,6 @@ where
     Ok(())
 }
 
-
 #[test]
 fn poseidon_flat_public_inputs() -> anyhow::Result<()> {
     use plonky2::field::types::Field;
@@ -170,6 +171,7 @@ fn poseidon_flat_public_inputs() -> anyhow::Result<()> {
 
     let inputs = vec![preimage];
     let hash_target = builder.hash_n_to_hash_no_pad::<PoseidonHash>(inputs);
+
     for e in expected_hash.elements {
         builder.register_public_input(e);
     }
@@ -184,7 +186,6 @@ fn poseidon_flat_public_inputs() -> anyhow::Result<()> {
     let mut pw = PartialWitness::new();
     pw.set_target(preimage, preimage_value).unwrap();
     pw.set_hash_target(expected_hash, hash_val).unwrap();
-    println!("hash_target: {:?}", hash_val);
 
     let proof = data.prove(pw).unwrap();
 

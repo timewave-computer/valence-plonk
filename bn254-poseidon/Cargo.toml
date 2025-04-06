@@ -1,0 +1,19 @@
+[package]
+name = "plonky2-bn254-poseidon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+hex = "0.4"
+num = "0.4"
+plonky2 = { git = "https://github.com/mir-protocol/plonky2.git", tag = "v1.0.2" }
+rand = "0.8"
+serde = "1.0"
+serde_json = "1.0"
+ark-bn254 = "0.4.0"
+ark-ff = "0.4.0"
+ark-crypto-primitives = { version = "0.4.0", features = ["sponge"] }
+ark-std = "0.4.0"
+halo2_proofs="0.3"
+halo2curves = "0.8"
