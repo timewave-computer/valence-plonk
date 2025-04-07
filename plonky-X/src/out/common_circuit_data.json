@@ -34,13 +34,15 @@
         ]
       }
     },
-    "degree_bits": 2,
+    "degree_bits": 3,
     "hiding": false,
     "reduction_arity_bits": []
   },
   "gates": [
+    "NoopGate",
     "ConstantGate { num_consts: 2 }",
     "PublicInputGate",
+    "ArithmeticGate { num_ops: 20 }",
     "PoseidonGate(PhantomData<plonky2_field::goldilocks_field::GoldilocksField>)<WIDTH=12>"
   ],
   "k_is": [
@@ -126,24 +128,30 @@
     3834749477258943827
   ],
   "luts": [],
-  "num_constants": 3,
+  "num_constants": 4,
   "num_gate_constraints": 123,
   "num_lookup_polys": 0,
   "num_lookup_selectors": 0,
   "num_partial_products": 9,
-  "num_public_inputs": 4,
+  "num_public_inputs": 1,
   "quotient_degree_factor": 8,
   "selectors_info": {
     "groups": [
       {
-        "end": 3,
+        "end": 4,
         "start": 0
+      },
+      {
+        "end": 5,
+        "start": 4
       }
     ],
     "selector_indices": [
       0,
       0,
-      0
+      0,
+      0,
+      1
     ]
   }
 }
