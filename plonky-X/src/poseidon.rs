@@ -23,12 +23,6 @@ fn serialize_with_key_path(val: Value, path: Vec<String>) -> Value {
     let modulus_u64 = modulus.to_u64().unwrap();
 
     let current_key = path.last().map(|s| s.as_str());
-
-    // ✅ Special-case: Don't touch `k_is`, just return raw u64 array
-    if current_key == Some("k_is") {
-        return val;
-    }
-
     // Field elements known to be serialized in limb form
     let is_field_element_key = current_key.map_or(false, |key| {
         matches!(
