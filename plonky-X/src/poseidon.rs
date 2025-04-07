@@ -20,9 +20,17 @@ type F = <C as GenericConfig<D>>::F;
 
 fn serialize_with_key_path(val: Value, path: Vec<String>) -> Value {
     let modulus = BigUint::parse_bytes(b"FFFFFFFF00000001", 16).unwrap();
+    let modulus_u64 = modulus.to_u64().unwrap();
 
-    // Keys under which we expect field elements (limbs) to appear
-    let is_field_element_key = path.last().map(|s| s.as_str()).map_or(false, |key| {
+    let current_key = path.last().map(|s| s.as_str());
+
+    // ✅ Special-case: Don't touch `k_is`, just return raw u64 array
+    if current_key == Some("k_is") {
+        return val;
+    }
+
+    // Field elements known to be serialized in limb form
+    let is_field_element_key = current_key.map_or(false, |key| {
         matches!(
             key,
             "siblings"
@@ -36,7 +44,7 @@ fn serialize_with_key_path(val: Value, path: Vec<String>) -> Value {
 
     match val {
         Value::Object(mut map) => {
-            // Special case: auto-unwrap { "elements": [...] }
+            // Auto-unwrap { "elements": [...] }
             if map.len() == 1 && map.contains_key("elements") {
                 let inner = map.remove("elements").unwrap();
                 return serialize_with_key_path(inner, path);
@@ -67,7 +75,7 @@ fn serialize_with_key_path(val: Value, path: Vec<String>) -> Value {
                     return packed.first().unwrap().clone();
                 }
 
-                // Case 2: Nested arrays of limbs (e.g., [[u64; 4], [u64; 4]])
+                // Case 2: Nested arrays of limbs
                 if arr.iter().all(|v| matches!(v, Value::Array(inner) if inner.len() == 4 && inner.iter().all(|x| x.is_u64()))) {
                     let packed: Vec<_> = arr
                         .into_iter()
@@ -86,7 +94,7 @@ fn serialize_with_key_path(val: Value, path: Vec<String>) -> Value {
                 }
             }
 
-            // Recurse into sub-elements
+            // Generic case — recurse into sub-arrays
             Value::Array(
                 arr.into_iter()
                     .map(|v| serialize_with_key_path(v, path.clone()))
@@ -96,7 +104,7 @@ fn serialize_with_key_path(val: Value, path: Vec<String>) -> Value {
 
         Value::Number(ref n) => {
             if let Some(u) = n.as_u64() {
-                Value::Number(serde_json::Number::from(u))
+                Value::Number(serde_json::Number::from(u % modulus_u64))
             } else {
                 val
             }
@@ -106,7 +114,7 @@ fn serialize_with_key_path(val: Value, path: Vec<String>) -> Value {
     }
 }
 
-// Example function to save serialized hash output to a file
+// Save the relevant pieces as JSON files
 pub(crate) fn save_files<C: GenericConfig<D>, const D: usize>(
     data: &plonky2::plonk::circuit_data::CircuitData<C::F, C, D>,
     proof: &plonky2::plonk::proof::ProofWithPublicInputs<C::F, C, D>,
@@ -118,7 +126,7 @@ where
     let verifier_only_json = serde_json::to_value(&data.verifier_only).unwrap();
     let proof_json = serde_json::to_value(proof).unwrap();
 
-    // Serialize with customized field handling
+    // Customized serializer that respects paths like `k_is`
     let common_data_simplified = serialize_with_key_path(common_data_json, vec![]);
     let verifier_only_simplified = serialize_with_key_path(verifier_only_json, vec![]);
     let proof_simplified = serialize_with_key_path(proof_json, vec![]);
@@ -141,7 +149,6 @@ where
     Ok(())
 }
 
-
 #[test]
 fn add_public_inputs() -> anyhow::Result<()> {
     use plonky2::field::types::Field;
@@ -149,41 +156,30 @@ fn add_public_inputs() -> anyhow::Result<()> {
     let config = CircuitConfig::standard_recursion_config();
     let mut builder = CircuitBuilder::<F, D>::new(config);
 
-    // Create a virtual target for the input
+    // Input setup
     let input = builder.add_virtual_target();
-
-    // Add constant 6 to the input
     let six = builder.constant(F::from_canonical_u64(6));
     let sum = builder.add(input, six);
-
-    // Register sum as public input
     builder.register_public_input(sum);
 
-    // Build the circuit
+    // Build and prove
     let data = builder.build::<C>();
-
-    // Define input value
     let input_value = F::from_canonical_u64(7);
-
-    // Create the witness
     let mut pw = PartialWitness::new();
     pw.set_target(input, input_value).unwrap();
-
-    // Prove the circuit
     let proof = data.prove(pw).unwrap();
-    save_files(&data, &proof).unwrap(); // Save the simplified JSON files
 
-    // Serialize and deserialize the verifier circuit data
+    save_files(&data, &proof).unwrap();
+
+    // Round-trip test for verifier data
     let elf_serialized = data
         .verifier_data()
         .to_bytes(&DefaultGateSerializer)
         .expect("Failed to serialize program ELF");
-
     let elf_deserialized: VerifierCircuitData<F, C, D> =
         VerifierCircuitData::from_bytes(elf_serialized, &DefaultGateSerializer)
             .expect("Failed to deserialize program ELF");
 
-    // Verify the proof
     elf_deserialized.verify(proof).unwrap();
     Ok(())
 }
