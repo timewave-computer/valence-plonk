@@ -1,5 +1,9 @@
 # Plonkish circuits for the Valence Coprocessor Trie
-This repository will contain merkle proof circuits for our custom Trie implementation.
+This repository is part of exploration efforts into different proofs sytems.
+We are focussing on Plonkish circuits, but others may be added here if there is a reason to experiment with them.
+Ultimately we want to find a proof system that we can confidently use for just the opening proofs in the coprocessor.
+
+For complex computations we will stick with a generic design for ZKVMs like Succinct / Risc0 / Valida / ...
 
 # 1. Plonky2
 See [here](plonky-X/src/poseidon.rs)
